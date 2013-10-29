@@ -1,0 +1,14 @@
+# CIRCLETP CONFIGURATION FILE
+# It's not recommended to modify this file directly. Use commands instead.
+# If you still want to change it manually, make sure that minRadius < maxRadius (except if maxRadius == 0). Otherwise the plugin will not work properly.
+# If you screw up the configs, you can always delete the file and let the plugin generate a fresh one :)
+
+center:
+    x: 0
+    z: 0
+    world: world
+minRadius: 10
+maxRadius: 20
+forceHeight: -1
+relativeTP: true
+tell: false
