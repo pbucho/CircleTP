@@ -1,0 +1,13 @@
+# Here are explained the configurations of CircleTP.
+
+# ================= CIRCLETP DEFAULT CONFIG =================
+
+center:             # defines the coordinates of the central point if you want teleportation to be absolute
+    x: 0            # defines the x coordinate of the central point
+    z: 0            # defines the z coordinate of the central point
+    world: world    # defines the world in which the central point is located
+minRadius: 10       # defines the minimum radius. Players will be teleported outside this radius
+maxRadius: 20       # defines the maximum radius. Players will be teleported inside this radius, except if 0, which means that there is no maximum radius
+forceHeight: -1     # defines wether the players are teleported to the highest block of the random destination (=-1) or to a fixed height (>-1)
+relativeTP: true    # defines wether the players are teleported to a point relative to their initial position or to a point relative to the coordinates defined above as center (absolute teleportation)
+tell: false         # if a player is teleported by another player, should the teleported player know who teleported him (=true) or not (=false)?
