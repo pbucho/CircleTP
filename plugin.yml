@@ -1,0 +1,14 @@
+name: CircleTP
+main: pt.outlook.pyropt.circleTP.CircleTP
+author: iPedro2/PyroPT
+prefix: CTP
+version: 0.9.1, 29 Oct 2013 (Mah birthday!)
+description: >
+             Simple plugin to teleport players to random locations inside a circle area.
+commands:
+  ctp:
+    description: Teleports the player that issued the command or [player] to a random location.
+  ctpadmin:
+    description: Performs administrative actions.
+  ctpver:
+    description: Displays information about the plugin.
