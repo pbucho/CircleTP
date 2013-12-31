@@ -1,5 +1,6 @@
 # CIRCLETP CONFIGURATION FILE
 # It's not recommended to modify this file directly. Use commands instead.
+# Set cooldown to -1 to deactivate teleportation cooldown
 # If you still want to change it manually, make sure that minRadius < maxRadius (except if maxRadius == 0). Otherwise the plugin will not work properly.
 # If you screw up the configs, you can always delete the file and let the plugin generate a fresh one :)
 # This plugin collects information about its usage. This information is anonymous. It does not identify you or your server and it's publicly available at http://mcstats.org/plugin/CircleTP. Data collection is optional, and you can disable it setting "metrics: true" to "false". 
@@ -12,5 +13,6 @@ minRadius: 10
 maxRadius: 20
 forceHeight: -1
 relativeTP: true
-tell: false
+tell: true
+cooldown: 20
 metrics: true
