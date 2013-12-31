@@ -17,44 +17,28 @@ import org.mcstats.MetricsLite;
 
 public class CircleTP extends JavaPlugin {
 
-	public static CircleTP plugin;
 	public String prefix = (ChatColor.GREEN + "[CTP] " + ChatColor.RESET);
+	private CooldownManager cDM = new CooldownManager(this, 60);
+	private SignManager signManager = new SignManager(this, prefix);
 	public String tab = ("     ");
-	public int minRadius;
-	public int maxRadius;
-	public int height;
-	public int[] lastTpCoord = new int[3];
-	public World lastTpWorld;
-	public boolean relativeTP;
-	public boolean tell;
-	public boolean misconfig = false;
-	public boolean metrics = true;
-	public Location center = new Location(null, 0, 0, 0);
+	private int minRadius;
+	private int maxRadius;
+	private int height;
+	private int cooldown = 60;
+	private int[] lastTpCoord = new int[3];
+	private World lastTpWorld;
+	private boolean relativeTP;
+	private boolean tell;
+	private boolean misconfig = false;
+	private boolean metrics = true;
+	private Location center = new Location(null, 0, 0, 0);
 	Logger log = Bukkit.getLogger();
 	File configFile = new File(getDataFolder() + "config.yml");
 
 	@Override
-	public void onDisable() {
-		try {
-			this.getConfig().set("minRadius", minRadius);
-			this.getConfig().set("maxRadius", maxRadius);
-			this.getConfig().set("forceHeight", height);
-			this.getConfig().set("relativeTP", relativeTP);
-			this.getConfig().set("tell", tell);
-			this.getConfig().set("center.x", (int) center.getX());
-			this.getConfig().set("center.z", (int) center.getZ());
-			this.getConfig().set("center.world", center.getWorld().getName());
-			this.getConfig().set("metrics", metrics);
-			this.saveConfig();
-		} catch (final Exception e) {
-			log.info("Error saving config file.");
-			e.printStackTrace();
-		}
-	}
-
-	@Override
 	public void onEnable() {
-		if (!(configFile.exists())) {
+		Bukkit.getServer().getPluginManager().registerEvents(signManager, this);
+		if (!configFile.exists()) {
 			log.info("No config file detected. Creating a new one.");
 			this.saveDefaultConfig();
 		}
@@ -68,9 +52,13 @@ public class CircleTP extends JavaPlugin {
 			center.setZ(Double.valueOf(this.getConfig().getDouble("center.z")));
 			center.setWorld(this.getServer().getWorld(this.getConfig().getString("center.world")));
 			metrics = Boolean.valueOf(this.getConfig().getBoolean("metrics"));
+			cooldown = Integer.valueOf(this.getConfig().getInt("cooldown"));
 		}catch(final Exception e){
 			log.info("Error loading config file.");
 		}
+		if(cooldown < 0)
+			cooldown = Math.abs(cooldown);
+		cDM.setCooldown(cooldown);
 		if(metrics){
 			try {
 				MetricsLite metrics = new MetricsLite(this);
@@ -91,8 +79,26 @@ public class CircleTP extends JavaPlugin {
 		}
 	}
 
+	@Override
+	public void onDisable() {
+		try {
+			this.getConfig().set("minRadius", minRadius);
+			this.getConfig().set("maxRadius", maxRadius);
+			this.getConfig().set("forceHeight", height);
+			this.getConfig().set("relativeTP", relativeTP);
+			this.getConfig().set("tell", tell);
+			this.getConfig().set("center.x", (int) center.getX());
+			this.getConfig().set("center.z", (int) center.getZ());
+			this.getConfig().set("center.world", center.getWorld().getName());
+			this.getConfig().set("metrics", metrics);
+			this.getConfig().set("cooldown", cDM.getCooldown());
+			this.saveConfig();
+		} catch (final Exception e) {
+			log.severe("Error saving config file.");
+		}
+	}
+	
 	public boolean onCommand(CommandSender sender, Command cmd,	String commandLabel, String[] args) {
-		commandLabel.toLowerCase();
 		if (commandLabel.equalsIgnoreCase("ctp")) {
 			if(args.length > 0){
 				teleportOther(sender,args[0]);
@@ -101,7 +107,20 @@ public class CircleTP extends JavaPlugin {
 			}
 		} else if (commandLabel.equalsIgnoreCase("ctpadmin")) {
 			if(args.length < 1){
-				sender.sendMessage(prefix + ChatColor.RED + "Not enough arguments.");
+				sender.sendMessage(prefix + ChatColor.GREEN + "CircleTP commands:");
+				sender.sendMessage(ChatColor.YELLOW + "/ctp" + ChatColor.GOLD + " - Teleports to a random location.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctp [player]" + ChatColor.GOLD + " - Teleports [player] to a random location.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin" + ChatColor.GOLD + " - Performs administrative actions.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin setcenter" + ChatColor.GOLD + " - Sets the center for the absolue teleportation to the current position.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin setmaxradius" + ChatColor.GOLD + " - Sets the maximum teleportation radius.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin setminradius" + ChatColor.GOLD + " - Sets the minimum teleportation radius.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin forceheight" + ChatColor.GOLD + " - Forces teleportation to a given height (-1 to disable).");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin tpmode" + ChatColor.GOLD + " - Toggles between absolute or relative teleportation.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin tell" + ChatColor.GOLD + " - Toggles wether the players are told who teleported them.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin cooldown" + ChatColor.GOLD + " - Sets the cooldown period (0 to disable).");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin reload" + ChatColor.GOLD + " - Reloads the configuration file.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpadmin checkconfig" + ChatColor.GOLD + " - Displays the plugin configurations.");
+				sender.sendMessage(ChatColor.YELLOW + "/ctpver" + ChatColor.GOLD + " - Displays the plugin version.");
 			}else{
 				admin(sender,args);
 			}
@@ -112,172 +131,204 @@ public class CircleTP extends JavaPlugin {
 	}
 
 	public void teleportSelf(CommandSender sender){
-		if(sender.hasPermission("CircleTP.ctp")){
-			if(misconfig == true){
-				sender.sendMessage(prefix + ChatColor.RED + "The plugin is misconfigured and cannot be used (minRadius > maxRadius).");
-				sender.sendMessage(prefix + ChatColor.RED + "If you're an admin, please correct this situation.");
-			}else{
-				if (!(sender instanceof Player)) {
-					sender.sendMessage(prefix + ChatColor.GOLD + "You are the console. How do you expect me to teleport you?");
-				} else {
-					Player issuer = (Player) sender;
-					issuer.teleport(getRandomLocation(issuer));
-					issuer.sendMessage(prefix + ChatColor.GOLD + "You have been teleported to a random location.");
-					log.info(issuer.getName() + " has been teleported to: " + lastTpWorld.getName() + ", (" + lastTpCoord[0] + "," + lastTpCoord[1] + "," + lastTpCoord[2] + ")");
-				}
-			}
-		}else{
-			sender.sendMessage(prefix + ChatColor.RED + "You do not have permission to teleport yourself.");
+		if(!sender.hasPermission("CircleTP.ctp")){
+			sender.sendMessage(prefix + ChatColor.RED + "You don't have permission to teleport yourself.");
+			return;
 		}
+		if(misconfig){
+			sender.sendMessage(prefix + ChatColor.RED + "The plugin is misconfigured and cannot be used (minRadius > maxRadius).");
+			sender.sendMessage(prefix + ChatColor.RED + "If you're an admin, please correct this situation.");
+			return;
+		}
+		if (!(sender instanceof Player)) {
+			sender.sendMessage(prefix + ChatColor.GOLD + "You are the console. How do you expect to be teleported?");
+			return;
+		}
+		Player issuer = (Player) sender;
+		if(cDM.isCoolingDown(issuer) && !issuer.hasPermission("CircleTP.override")){
+			sender.sendMessage(prefix + ChatColor.RED + "You have been recently teleported. Please wait before teleporting again.");
+			return;
+		}
+		cDM.cancelCooldown(issuer);
+		issuer.teleport(getRandomLocation(issuer));
+		issuer.sendMessage(prefix + ChatColor.GOLD + "You have been teleported to a random location.");
+		log.info(issuer.getName() + " has been teleported to: " + lastTpWorld.getName() + ", (" + lastTpCoord[0] + "," + lastTpCoord[1] + "," + lastTpCoord[2] + ")");
+		cDM.initiateCooldown(issuer);
 	}
 
-	public void teleportOther(CommandSender sender, String targetName){
-		if(sender.hasPermission("CircleTP.ctp.others")){
-			if(misconfig == true){
-				sender.sendMessage(prefix + ChatColor.RED + "The plugin is misconfigured and cannot be used (minRadius > maxRadius).");
-				sender.sendMessage(prefix + ChatColor.RED + "If you're an admin, please correct this situation.");
-			}else{
-				if (sender.getServer().getPlayer(targetName) == null) {
-					sender.sendMessage(prefix + ChatColor.RED + "Player not found.");
-				} else {
-					Player target = sender.getServer().getPlayer(targetName);
-					if(targetName.equalsIgnoreCase(sender.getServer().getName()) && !sender.hasPermission("CircleTP.ctp")){
-						sender.sendMessage(prefix + ChatColor.RED + "You do not have permission to teleport yourself.");
-					}else{
-						target.teleport(getRandomLocation(target));
-						sender.sendMessage(prefix + ChatColor.GOLD + "You have teleported " + target.getName() + " to a random location.");
-						if(tell == false){
-							target.sendMessage(prefix + ChatColor.GOLD + "You have been teleported to a random location.");
-						}else{
-							target.sendMessage(prefix + ChatColor.GOLD + "You have been teleported to a random location by " + sender.getName() + ".");
-						}
-						log.info(sender.getName() + " has teleported " + target.getName() + " to: " + lastTpWorld.getName() + ", (" + lastTpCoord[0] + "," + lastTpCoord[1] + "," + lastTpCoord[2] + ")");
-					}
-				}
-			}
-		}else{
+	private void teleportOther(CommandSender sender, String targetName){
+		if(!sender.hasPermission("CircleTP.ctp.others")){
 			sender.sendMessage(prefix + ChatColor.RED + "You do not have permission to teleport other players.");
+			return;
 		}
+		if(misconfig){
+			sender.sendMessage(prefix + ChatColor.RED + "The plugin is misconfigured and cannot be used (minRadius > maxRadius).");
+			sender.sendMessage(prefix + ChatColor.RED + "If you're an admin, please correct this situation.");
+			return;
+		}
+		if (getPlayer(targetName) == null) {
+			sender.sendMessage(prefix + ChatColor.RED + "Player not found.");
+			return;
+		}
+		Player target = getPlayer(targetName);
+		if(targetName.equalsIgnoreCase(sender.getName())){
+			if(!target.hasPermission("CircleTP.ctp")){
+				target.sendMessage(prefix + ChatColor.RED + "You do not have permission to teleport yourself.");
+				return;
+			}
+			if(cDM.isCoolingDown(target) && !target.hasPermission("CircleTP.override")){
+				target.sendMessage(prefix + ChatColor.RED + "You have been recently teleported. Please wait before teleporting again.");
+				return;
+			}
+		}
+		cDM.cancelCooldown(target);
+		target.teleport(getRandomLocation(target));
+		sender.sendMessage(prefix + ChatColor.GOLD + "You have teleported " + target.getName() + " to a random location.");
+		cDM.initiateCooldown(target);
+		if(tell)
+			target.sendMessage(prefix + ChatColor.GOLD + "You have been teleported to a random location by " + sender.getName() + ".");
+		else
+			target.sendMessage(prefix + ChatColor.GOLD + "You have been teleported to a random location.");
+		log.info(sender.getName() + " has teleported " + target.getName() + " to: " + lastTpWorld.getName() + ", (" + lastTpCoord[0] + "," + lastTpCoord[1] + "," + lastTpCoord[2] + ")");
 	}
 
-	public void setCenter(CommandSender sender){
+	private void setCenter(CommandSender sender){
 		if (!(sender instanceof Player)) {
 			sender.sendMessage(prefix + ChatColor.RED + "This command must be run by a in-game player.");
-		} else {
-			Player issuer = (Player) sender;
-			center = issuer.getLocation();
-			sender.sendMessage(prefix + ChatColor.GOLD + "Center defined to: " + center.getWorld().getName() + ", (" + (int) center.getX() + "," + (int) center.getY() + "," + (int) center.getZ() + ").");
-			this.getConfig().set("center.x", (int) center.getX());
-			this.getConfig().set("center.z", (int) center.getZ());
-			this.getConfig().set("center.world", center.getWorld().getName());
-			this.saveConfig();
+			return;
 		}
+		Player issuer = (Player) sender;
+		center = issuer.getLocation();
+		sender.sendMessage(prefix + ChatColor.GOLD + "Center defined to: " + center.getWorld().getName() + ", (" + (int) center.getX() + "," + (int) center.getY() + "," + (int) center.getZ() + ").");
+		if(relativeTP){
+			sender.sendMessage(ChatColor.GOLD + "Absolute teleportation is not enabled. Use \"/ctpadmin tpmode\" to enable it.");
+		}
+		this.getConfig().set("center.x", (int) center.getX());
+		this.getConfig().set("center.z", (int) center.getZ());
+		this.getConfig().set("center.world", center.getWorld().getName());
+		this.saveConfig();
 	}
 
-	public void admin(CommandSender sender, String[] args){
+	private void admin(CommandSender sender, String[] args){
 		if (!sender.hasPermission("CircleTP.admin")) {
 			sender.sendMessage(prefix + ChatColor.RED + "You do not have permission to change configurations.");
-		} else {
-			args[0].toLowerCase();
-			if (args[0].equalsIgnoreCase("setcenter")) {
-				setCenter(sender);
-			} else if (args[0].equalsIgnoreCase("setminradius") || args[0].equalsIgnoreCase("setminimumradius")) {
-				setMinRadius(sender,args);
-			} else if (args[0].equalsIgnoreCase("setmaxradius") || args[0].equalsIgnoreCase("setmaximumradius")) {
-				setMaxRadius(sender,args);
-			} else if (args[0].equalsIgnoreCase("forceheight")) {
-				forceHeight(sender,args);
-			} else if (args[0].equalsIgnoreCase("tpmode")){
-				tpMode(sender,args);
-			} else if (args[0].equalsIgnoreCase("checkconfig")) {
-				checkConfig(sender);
-			} else if (args[0].equalsIgnoreCase("tell") || args[0].equalsIgnoreCase("tellmode")){
-				tellMode(sender,args);
-			} else if(args[0].equalsIgnoreCase("reload")){
-				reloadCfg(sender);
-			} else {
-				sender.sendMessage(prefix + ChatColor.RED + "Argument not recognized.");
-			}
+			return;
 		}
+		if (args[0].equalsIgnoreCase("setcenter"))
+			setCenter(sender);
+		else if (args[0].equalsIgnoreCase("setminradius") || args[0].equalsIgnoreCase("setminimumradius"))
+			setMinRadius(sender,args);
+		else if (args[0].equalsIgnoreCase("setmaxradius") || args[0].equalsIgnoreCase("setmaximumradius"))
+			setMaxRadius(sender,args);
+		else if (args[0].equalsIgnoreCase("forceheight"))
+			forceHeight(sender,args);
+		else if (args[0].equalsIgnoreCase("tpmode"))
+			tpMode(sender,args);
+		else if (args[0].equalsIgnoreCase("checkconfig"))
+			checkConfig(sender);
+		else if (args[0].equalsIgnoreCase("tell") || args[0].equalsIgnoreCase("tellmode"))
+			tellMode(sender,args);
+		else if(args[0].equalsIgnoreCase("reload"))
+			reloadCfg(sender);
+		else if(args[0].equalsIgnoreCase("cooldown"))
+			setCooldown(sender,args);
+		else
+			sender.sendMessage(prefix + ChatColor.RED + "Invalid command.");
 	}
 
-	public void setMinRadius(CommandSender sender, String[] args){
+	private void setCooldown(CommandSender sender, String[] args) {
+		if(args.length < 2){
+			sender.sendMessage(prefix + ChatColor.RED + "Please define cooldown period.");
+			return;
+		}
+		int cooldown = Integer.parseInt(args[1]);
+		if(cooldown < 0)
+			cooldown = Math.abs(cooldown);
+		cDM.setCooldown(cooldown);
+		if(cooldown == 0)
+			sender.sendMessage(prefix + ChatColor.GOLD + "Cooldown deactivated.");
+		else
+			sender.sendMessage(prefix + ChatColor.GOLD + "Cooldown set to " + cooldown + " seconds.");
+		this.getConfig().set("cooldown", cooldown);
+		this.saveConfig();
+	}
+
+	private void setMinRadius(CommandSender sender, String[] args){
 		if (args.length < 2) {
 			sender.sendMessage(prefix + ChatColor.RED + "Please define minimum radius.");
-		} else {
-			if (maxRadius < Math.abs(Integer.parseInt(args[1]))) {
-				sender.sendMessage(prefix + ChatColor.RED + "The minumum radius cannot be greater than the maximum radius.");
-			} else {
-				minRadius = Math.abs(Integer.parseInt(args[1]));
-				misconfig = false;
-				sender.sendMessage(prefix + ChatColor.GOLD + "Minimum radius has been set to " + minRadius + ".");
-				this.getConfig().set("minRadius", minRadius);
-				this.saveConfig();
-			}
+			return;
 		}
+		if (maxRadius < Math.abs(Integer.parseInt(args[1]))) {
+			sender.sendMessage(prefix + ChatColor.RED + "The minumum radius cannot be greater than the maximum radius.");
+			return;
+		}
+		minRadius = Math.abs(Integer.parseInt(args[1]));
+		misconfig = false;
+		sender.sendMessage(prefix + ChatColor.GOLD + "Minimum radius has been set to " + minRadius + ".");
+		this.getConfig().set("minRadius", minRadius);
+		this.saveConfig();
 	}
 
-	public void setMaxRadius(CommandSender sender, String[] args){
+	private void setMaxRadius(CommandSender sender, String[] args){
 		if (args.length < 2) {
 			sender.sendMessage(prefix + ChatColor.RED + "Please define maximum radius.");
-		} else {
-			if (minRadius > Math.abs(Integer.parseInt(args[1])) && Integer.parseInt(args[1]) != 0) {
-				sender.sendMessage(prefix + ChatColor.RED + "The maximum radius cannot be smaller than the minimum radius.");
-			} else {
-				maxRadius = Math.abs(Integer.parseInt(args[1]));
-				misconfig = false;
-				sender.sendMessage(prefix + ChatColor.GOLD + "Maximum radius has been set to " + maxRadius + ".");
-				this.getConfig().set("maxRadius", maxRadius);
-				this.saveConfig();
-			}
+			return;
 		}
+		if (minRadius > Math.abs(Integer.parseInt(args[1])) && Integer.parseInt(args[1]) != 0) {
+			sender.sendMessage(prefix + ChatColor.RED + "The maximum radius cannot be smaller than the minimum radius.");
+			return;
+		}
+		maxRadius = Math.abs(Integer.parseInt(args[1]));
+		misconfig = false;
+		sender.sendMessage(prefix + ChatColor.GOLD + "Maximum radius has been set to " + maxRadius + ".");
+		this.getConfig().set("maxRadius", maxRadius);
+		this.saveConfig();
 	}
 
-	public void forceHeight(CommandSender sender, String[] args){
+	private void forceHeight(CommandSender sender, String[] args){
 		if (args.length < 2) {
 			sender.sendMessage(prefix + ChatColor.RED + "Please define height. Use -1 to deactivate this feature.");
-		} else {
-			height = Integer.parseInt(args[1]);
-			if(height < -1)
-				height = -1;
-			if(height == -1)
-				sender.sendMessage(prefix + ChatColor.GOLD + "Players will be teleported to the highest block.");
-			else
-				sender.sendMessage(prefix + ChatColor.GOLD + "Players will always be teleported y=" + height + ".");
-			this.getConfig().set("forceHeight", height);
-			this.saveConfig();
+			return;
 		}
+		height = Integer.parseInt(args[1]);
+		if(height < -1)
+			height = -1;
+		if(height == -1)
+			sender.sendMessage(prefix + ChatColor.GOLD + "Players will be teleported to the highest block.");
+		else
+			sender.sendMessage(prefix + ChatColor.GOLD + "Players will always be teleported y=" + height + ".");
+		this.getConfig().set("forceHeight", height);
+		this.saveConfig();
 	}
 
-	public void tpMode(CommandSender sender, String[] args){
+	private void tpMode(CommandSender sender, String[] args){
 		if(args.length < 2){
-			if(relativeTP == true){
+			if(relativeTP){
 				relativeTP = false;
-				sender.sendMessage(prefix + ChatColor.GOLD + "Relative TP deactivated.");
+				sender.sendMessage(prefix + ChatColor.GOLD + "Absolute TP activated.");
 			}else{
 				relativeTP = true;
 				sender.sendMessage(prefix + ChatColor.GOLD + "Relative TP activated.");
 			}
 		}else{
-			args[1].toLowerCase();
 			if(args[1].equalsIgnoreCase("false")){
 				relativeTP = false;
-				sender.sendMessage(prefix + ChatColor.GOLD + "Relative TP deactivated.");
+				sender.sendMessage(prefix + ChatColor.GOLD + "Absolute TP activated.");
 			}else if(args[1].equalsIgnoreCase("true")){
 				relativeTP = true;
 				sender.sendMessage(prefix + ChatColor.GOLD + "Relative TP activated.");
 			}else{
 				sender.sendMessage(prefix + ChatColor.RED + "Enter \"true\" or \"false\"");
-				sender.sendMessage(prefix + ChatColor.RED + "Write nothing to toggle.");
+				sender.sendMessage(prefix + ChatColor.RED + "Enter nothing to toggle.");
 			}
 		}
 		this.getConfig().set("relativeTP", relativeTP);
 		this.saveConfig();
 	}
 
-	public void tellMode(CommandSender sender, String[] args){
+	private void tellMode(CommandSender sender, String[] args){
 		if(args.length < 2){
-			if(tell == true){
+			if(tell){
 				tell = false;
 				sender.sendMessage(prefix + ChatColor.GOLD + "Players will not be told who teleported them.");
 			}else{
@@ -285,7 +336,6 @@ public class CircleTP extends JavaPlugin {
 				sender.sendMessage(prefix + ChatColor.GOLD + "Players will be told who teleported them.");
 			}
 		}else{
-			args[1].toLowerCase();
 			if(args[1].equalsIgnoreCase("false")){
 				tell = false;
 				sender.sendMessage(prefix + ChatColor.GOLD + "Players will not be told who teleported them.");
@@ -298,28 +348,32 @@ public class CircleTP extends JavaPlugin {
 			}
 		}
 		this.getConfig().set("tell", tell);
+		this.saveConfig();
 	}
 
-	public void checkConfig(CommandSender sender){
+	private void checkConfig(CommandSender sender){
 		sender.sendMessage(prefix + ChatColor.GOLD + "The plugin is configured as follows:");
 		sender.sendMessage(ChatColor.GOLD + "Minimum radius: " + minRadius);
 		if(maxRadius == 0){
 			sender.sendMessage(ChatColor.GOLD + "Maximum radius: " + ChatColor.RED + "deactivated");
 		}else{
-			if(misconfig == true){
+			if(misconfig){
 				sender.sendMessage(ChatColor.GOLD + "Maximum radius: " + ChatColor.RED + maxRadius);
 			}else{
 				sender.sendMessage(ChatColor.GOLD + "Maximum radius: " + maxRadius);
 			}
 		}
-		if(height == -1){
+		if(cDM.isActive())
+			sender.sendMessage(ChatColor.GOLD + "Cooldown: " + cDM.getCooldown());
+		else
+			sender.sendMessage(ChatColor.GOLD + "Cooldown: deactivated");
+		if(height == -1)
 			sender.sendMessage(ChatColor.GOLD + "Force height: deactivated");
-		}else{
+		else
 			sender.sendMessage(ChatColor.GOLD + "Force height: " + height);
-		}
 		sender.sendMessage(ChatColor.GOLD + "Tell: " + tell);
 		sender.sendMessage(ChatColor.GOLD + "Relative TP: " + relativeTP);
-		if(relativeTP == false){
+		if(!relativeTP){
 			sender.sendMessage(ChatColor.GOLD + "Center:");
 			sender.sendMessage(ChatColor.GOLD + tab + "x=" + (int) center.getX() + ", z=" + (int) center.getZ() + ", world: " + center.getWorld().getName());
 		}
@@ -339,7 +393,7 @@ public class CircleTP extends JavaPlugin {
 	public Location getRandomLocation(Player target){
 		Location destination = new Location(null, 0, 0, 0);
 
-		if(relativeTP == true){
+		if(relativeTP){
 			lastTpCoord[0] = (int) target.getLocation().getX();
 			lastTpCoord[2] = (int) target.getLocation().getZ();
 			destination.setWorld(target.getLocation().getWorld());
@@ -368,7 +422,7 @@ public class CircleTP extends JavaPlugin {
 		return destination;
 	}
 
-	public void displayVersion(CommandSender sender){
+	private void displayVersion(CommandSender sender){
 		if(sender.hasPermission("CircleTP.ver")){
 			PluginDescriptionFile pdf = this.getDescription();
 			sender.sendMessage(ChatColor.AQUA + "========== CIRCLE TP ==========");
@@ -380,7 +434,7 @@ public class CircleTP extends JavaPlugin {
 		}
 	}
 
-	public void reloadCfg(CommandSender sender){
+	private void reloadCfg(CommandSender sender){
 		try{
 			this.reloadConfig();
 			minRadius = Integer.valueOf(this.getConfig().getInt("minRadius"));
@@ -391,11 +445,18 @@ public class CircleTP extends JavaPlugin {
 			center.setX(Double.valueOf(this.getConfig().getDouble("center.x")));
 			center.setZ(Double.valueOf(this.getConfig().getDouble("center.z")));
 			center.setWorld(this.getServer().getWorld(this.getConfig().getString("center.world")));
+			cooldown = Integer.valueOf(this.getConfig().getInt("cooldown"));
 			metrics = Boolean.valueOf(this.getConfig().getBoolean("metrics"));
 			sender.sendMessage(prefix + ChatColor.GOLD + "Plugin reloaded successfully.");
 		}catch(final Exception e){
 			sender.sendMessage(prefix + ChatColor.RED + "Error loading config file.");
 		}
+		if(cooldown < 0){
+			cooldown = Math.abs(cooldown);
+			this.getConfig().set("cooldown", cooldown);
+			this.saveConfig();
+		}
+		cDM.setCooldown(cooldown);
 		if(minRadius > maxRadius && maxRadius != 0){
 			sender.sendMessage(ChatColor.RED + "MINUMUM RADIUS IS GREATER THAN MAXIMUM RADIUS!");
 			sender.sendMessage(ChatColor.RED + "Use \"/ctpadmin checkconfig\" to check the radii and then \"/ctpadmin setminradius/setmaxradius\" to change them.");
@@ -408,5 +469,9 @@ public class CircleTP extends JavaPlugin {
 		if(height < -1){
 			height = -1;
 		}
+	}
+
+	public Player getPlayer(String name){
+		return this.getServer().getPlayer(name);
 	}
 }
