@@ -2,7 +2,7 @@ name: CircleTP
 main: me.iPedro2.circleTP.CircleTP
 author: iPedro2
 prefix: CTP
-version: 1.0, 23 Dec 2013
+version: 1.1, 1 Feb 2014
 description: >
              Simple plugin to teleport players to random locations inside a circle area.
 commands:
@@ -10,6 +10,10 @@ commands:
     description: Teleports the player that issued the command or [player] to a random location.
   ctpadmin:
     description: Performs administrative actions.
+  ctph:
+    description: Displays the plugin commands.
+  ctphelp:
+    description: Alias for ctph.
   ctpver:
     description: Displays information about the plugin.
 permissions:
@@ -28,6 +32,9 @@ permissions:
   CircleTP.admin:
     description: permission to change plugin configurations and reload config file.
     default: op
+  CircleTP.help:
+    description: permission to view command list.
+    default: true
   CircleTP.ver:
     description: permission to view plugin information.
     default: true
@@ -39,4 +46,5 @@ permissions:
       CircleTP.ctp.others: true
       CircleTP.override: true
       CircleTP.admin: true
+      CircleTP.help: true
       CircleTP.ver: true
