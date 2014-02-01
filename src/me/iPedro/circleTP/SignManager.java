@@ -16,10 +16,12 @@ public class SignManager implements Listener{
 	
 	private CircleTP plugin;
 	private String prefix;
+	private LocaleHandler l10n;
 	
-	public SignManager(CircleTP plugin, String prefix){
+	public SignManager(CircleTP plugin, String prefix, LocaleHandler l10n){
 		this.plugin = plugin;
 		this.prefix = prefix;
+		this.l10n = l10n;
 	}
 	
 	@EventHandler(priority=EventPriority.HIGH)
@@ -28,15 +30,15 @@ public class SignManager implements Listener{
 		String[] lines = event.getLines();
 		if(lines[0].equalsIgnoreCase("[ctp]") || lines[0].equalsIgnoreCase("[circletp]")){
 			if(!player.hasPermission("CircleTP.createSign")){
-				player.sendMessage(prefix + ChatColor.RED + "You don't have permission to create teleportation signs.");
+				player.sendMessage(prefix + ChatColor.RED + l10n.getString("error-tpsigns"));
 				event.getBlock().breakNaturally();
 				return;
 			}
 			event.setLine(0, ChatColor.DARK_GREEN + "[CTP]");
-			event.setLine(1, ChatColor.GOLD + "Right-click");
-			event.setLine(2, ChatColor.GOLD + "here to be");
-			event.setLine(3, ChatColor.GOLD + "teleported");
-			player.sendMessage(prefix + ChatColor.GOLD + "Teleportation sign created.");
+			event.setLine(1, ChatColor.GOLD + l10n.getString("sign-line1"));
+			event.setLine(2, ChatColor.GOLD + l10n.getString("sign-line2"));
+			event.setLine(3, ChatColor.GOLD + l10n.getString("sign-line3"));
+			player.sendMessage(prefix + ChatColor.GOLD + l10n.getString("info-tpsign-create"));
 		}
 	}
 	
