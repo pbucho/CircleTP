@@ -1,8 +1,12 @@
 # CIRCLETP CONFIGURATION FILE
-# It's not recommended to modify this file directly. Use commands instead.
-# Set cooldown to -1 to deactivate teleportation cooldown
+# It's not recommended to modify this file directly. Use commands instead. 
 # If you still want to change it manually, make sure that minRadius < maxRadius (except if maxRadius == 0). Otherwise the plugin will not work properly.
 # If you screw up the configs, you can always delete the file and let the plugin generate a fresh one :)
+# Set cooldown to 0 to deactivate teleportation cooldown
+# Set forceHeight to -1 to teleport players to the highest block.
+# The locale is in the "xx-XX" format (case sensitive)
+# forbiddenBlocks is the ID of the blocks you don't want players to be teleported to. Insert one per line (don't use tabs)
+# List of block IDs: http://goo.gl/9f6YZ0
 # This plugin collects information about its usage. This information is anonymous. It does not identify you or your server and it's publicly available at http://mcstats.org/plugin/CircleTP. Data collection is optional, and you can disable it setting "metrics: true" to "false". 
 
 center:
@@ -16,3 +20,11 @@ relativeTP: true
 tell: true
 cooldown: 20
 metrics: true
+locale: "en-US"
+forbiddenBlocks:
+  - 8
+  - 9
+  - 10
+  - 11
+  - 51
+  - 30
